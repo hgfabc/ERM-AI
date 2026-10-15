@@ -1,0 +1,13 @@
+.venv/
+.cache/
+__pycache__/
+.pytest_cache/
+*.pyc
+artifacts/
+runs/
+smoke_output/
+*.pth
+*.pt
+.publish-work/
+predictions/
+downloaded_models/

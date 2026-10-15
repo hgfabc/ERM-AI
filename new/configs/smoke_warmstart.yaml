@@ -1,0 +1,10 @@
+# Run configs/smoke.yaml first, using the same manifest/splits.
+extends: smoke.yaml
+data:
+  streams: [gray_inner, gray_outer]
+model:
+  initialization:
+    gray_inner: ../smoke_output/single_run/fold_{fold}/best_model.pth
+experiment:
+  name: smoke_warmstart
+  output_dir: ../smoke_output/warmstart_run

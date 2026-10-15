@@ -1,0 +1,6 @@
+extends: smoke.yaml
+data:
+  streams: [color_inner, color_outer]
+experiment:
+  name: smoke_fusion
+  output_dir: ../smoke_output/fusion_run

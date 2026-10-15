@@ -1,0 +1,114 @@
+# Declared inference profiles for all indexed legacy experiments.
+# Keys/shapes can be checked from weights; historical stream semantics cannot.
+# Runtime evidence is recorded in notes. Unrecorded settings remain operator choices.
+collection_version: 1
+folds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+model:
+  name: resnet50
+  hidden_dim: 2048
+  freeze_backbones: false
+class_to_idx: {bad: 0, good: 1}
+preprocessing:
+  image_size: 448
+  resize_size: 448
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  resize_backend: tensor
+  interpolation: bilinear
+conditions:
+  single_vertical:
+    project: image-classification-7
+    source_prefix: _vertical
+    streams: [_vertical]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_horizontal:
+    project: image-classification-7
+    source_prefix: _horizontal
+    streams: [_horizontal]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_color_full:
+    project: image-classification-7
+    source_prefix: color_full
+    streams: [color_full]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_color_inner:
+    project: image-classification-7
+    source_prefix: color_inner
+    streams: [color_inner]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_color_outer:
+    project: image-classification-7
+    source_prefix: color_outer
+    streams: [color_outer]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_gray_full:
+    project: image-classification-7
+    source_prefix: gray_full
+    streams: [gray_full]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_gray_inner:
+    project: image-classification-7
+    source_prefix: gray_inner
+    streams: [gray_inner]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  single_gray_outer:
+    project: image-classification-7
+    source_prefix: gray_outer
+    streams: [gray_outer]
+    antialias: true
+    notes: Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.
+  fusion_2_cross:
+    project: image-classification-ms-2
+    source_prefix: _vertical
+    streams: [_vertical, _horizontal]
+    antialias: true
+    notes: Order follows historical inference directory naming; original YAML is missing. Two-stream runtime records use torchvision 0.17.1.
+  fusion_2_color:
+    project: image-classification-ms-2
+    source_prefix: color_inner
+    streams: [color_inner, color_outer]
+    antialias: true
+    notes: Order follows saved config2.yaml; two-stream runtime records use torchvision 0.17.1.
+  fusion_2_gray:
+    project: image-classification-ms-2
+    source_prefix: gray_inner
+    streams: [gray_inner, gray_outer]
+    antialias: true
+    notes: Order follows saved config3.yaml; two-stream runtime records use torchvision 0.17.1.
+  fusion_3_color:
+    project: image-classification-ms-3
+    source_prefix: color_inner
+    streams: [color_inner, color_outer, color_full]
+    antialias: true
+    notes: Order follows saved config4.yaml; three-stream runtime records use torchvision 0.17.1.
+  fusion_3_gray:
+    project: image-classification-ms-3
+    source_prefix: gray_inner
+    streams: [gray_inner, gray_outer, gray_full]
+    antialias: true
+    notes: Order follows saved config5.yaml; three-stream runtime records use torchvision 0.17.1.
+  fusion_4:
+    project: image-classification-ms-4s
+    source_prefix: _vertical
+    streams: [_vertical, _horizontal, color_full, gray_full]
+    antialias: true
+    notes: Order follows historical inference directory naming. Original runtime version is unrecorded; antialias true is an explicit operator choice to verify.
+  fusion_6:
+    project: image-classification-ms-6s
+    source_prefix: color_inner
+    streams: [color_inner, color_outer, color_full, gray_inner, gray_outer, gray_full]
+    antialias: true
+    notes: Order follows historical inference directory naming. Original runtime version is unrecorded; antialias true is an explicit operator choice to verify.
+  fusion_8:
+    project: image-classification-ms-8s
+    source_prefix: _vertical
+    streams: [_vertical, _horizontal, color_full, color_inner, color_outer, gray_full, gray_inner, gray_outer]
+    antialias: false
+    notes: Order follows saved config.yaml; saved eight-stream environment uses torchvision 0.16.2, whose Tensor Resize default was not antialiased.

@@ -1,0 +1,15 @@
+old/
+audit/
+archive_manifest.json
+**/.venv/
+**/.cache/
+**/.publish-work/
+**/__pycache__/
+**/.pytest_cache/
+**/runs/
+**/artifacts/
+**/smoke_output/
+**/verification.json
+*.pth
+*.pt
+*.safetensors

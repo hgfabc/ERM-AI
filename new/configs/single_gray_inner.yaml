@@ -1,0 +1,6 @@
+extends: base.yaml
+data:
+  streams: [gray_inner]
+experiment:
+  name: single_gray_inner
+  output_dir: ../runs/single_gray_inner

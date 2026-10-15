@@ -1,0 +1,26 @@
+extends: base.yaml
+data:
+  root: ../smoke_output/dataset
+  manifest: ../smoke_output/manifest.json
+  splits: ../smoke_output/splits.json
+  streams: [gray_inner]
+split:
+  n_folds: 2
+  val_fraction: 0.25
+preprocessing:
+  image_size: 32
+  resize_size: 36
+model:
+  name: resnet18
+  pretrained: false
+  hidden_dim: 16
+train:
+  epochs: 1
+  batch_size: 4
+  num_workers: 0
+  device: cpu
+  amp: false
+  patience: 0
+experiment:
+  name: smoke_single
+  output_dir: ../smoke_output/single_run

@@ -1,0 +1,6 @@
+extends: base.yaml
+data:
+  streams: [color_inner, color_outer, color_full, gray_inner, gray_outer, gray_full]
+experiment:
+  name: fusion_6
+  output_dir: ../runs/fusion_6
