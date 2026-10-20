@@ -339,6 +339,8 @@ python tools/run_experiments.py --config configs/base.yaml --conditions single_g
 
 ## 12. GitHub と Hugging Face への公開
 
+リポジトリのトップページ、本利用ガイド、モデルコレクション、各モデルの既定の README は英語で表示します。各ページ上部のリンクから繁体字中国語と日本語に切り替えられます。公開ツールは、コレクションと各モデルの README を 3 言語で再生成します。
+
 Windows で [publish_erm_ai.bat](publish_erm_ai.bat) をダブルクリックすると、`ntuhophai/ERM-AI` をローカルでログインしている GitHub アカウントに fork し、新バージョンのコードとドキュメントを commit して、手動で PR を作成するための比較ページを開きます。前回の公開用ブランチに他の変更がなく、PR が close / merge されていない場合は、そのブランチを更新し、既存の PR にも変更が反映されます。
 
 モデルの公開処理では、**16 ストリーム条件 × 10 folds = 160 モデルと、7 個の過去の重み、合計 167 個**を自動的に処理し、Hugging Face の `ntuhophai/ERM-AI` に対する同一 PR に追加して、管理者による merge を待ちます。1 個の checkpoint だけを選ぶのではなく、条件・fold ごとに独立したディレクトリ、重みのみのファイル、config、説明を用意します。元のモデルは約 43.4 GB あり、初回のエクスポートには追加の空き容量が必要です。中断後は、キャッシュとリモートの内容を照合して処理を再開できます。

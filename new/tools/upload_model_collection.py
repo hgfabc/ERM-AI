@@ -486,10 +486,14 @@ def _validate_pr_details(details, state, account):
             or _value(details, "url") != state["pr_url"]):
         raise RuntimeError("The saved PR does not match this repository, contributor, or branch; upload stopped")
     status = _value(details, "status")
+    if status == "merged" or _value(details, "merge_commit_oid") is not None:
+        raise RuntimeError("The saved Hugging Face PR has already been merged: " + state["pr_url"] + ". "
+                           "Preserve the external --state-file by renaming it, then rerun the launcher to "
+                           "prepare a new PR. Keep the model collection and its export-state cache")
     if status not in ("draft", "open"):
-        raise RuntimeError("The saved Hugging Face PR is closed or merged. It cannot receive more model commits")
-    if _value(details, "merge_commit_oid") is not None:
-        raise RuntimeError("The saved Hugging Face PR has already been merged; upload stopped")
+        raise RuntimeError("The saved Hugging Face PR is not open: " + state["pr_url"] + ". "
+                           "It cannot receive more model commits. Reopen the existing PR, or preserve its "
+                           "external --state-file and use a new one when intentionally starting another PR")
     state["pr_status"] = status
     return details
 

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 import threading
 from types import SimpleNamespace
@@ -85,6 +86,46 @@ def _windows_lock(code=5):
     error = PermissionError(13, "simulated transient Windows file lock")
     error.winerror = code
     return error
+
+
+class ModelCardLanguageTests(unittest.TestCase):
+    def test_model_card_languages_keep_all_scope_and_provenance_branches(self):
+        for kind in ("research", "demo"):
+            for legacy in (False, True):
+                with self.subTest(kind=kind, legacy=legacy):
+                    metadata = {"model_config": MODEL_CONFIG, "streams": ["gray_inner", "_vertical"],
+                                "class_to_idx": CLASSES, "artifact_kind": kind,
+                                "legacy_no_split_metadata": legacy}
+                    code_url = "https://github.com/example/ERM-AI/tree/public/new"
+                    card = exporter._model_card(metadata, code_url)
+                    _, front_matter, body = card.split("---", 2)
+                    parsed = yaml.safe_load(front_matter)
+                    self.assertEqual(parsed["language"], ["en", "zh", "ja"])
+                    self.assertIn(kind, parsed["tags"])
+                    navigation = body.strip().splitlines()[0]
+                    self.assertEqual(navigation, "[English](#english) | [繁體中文](#traditional-chinese) | [日本語](#japanese)")
+                    self.assertEqual(re.findall(r"\]\(#([^)]*)\)", navigation),
+                                     re.findall(r'<a id="([^"]+)"></a>', body))
+                    sections = re.split(r'<a id="[^"]+"></a>\n\n', body)[1:]
+                    self.assertEqual(len(sections), 3)
+                    scope_phrases = (("demo/smoke-test", "示範／冒煙測試", "デモ／スモークテスト") if kind == "demo"
+                                     else ("This is a research artifact", "這是研究用產物", "これは研究用の成果物"))
+                    provenance_phrases = (("case-level random folds", "病例層級的隨機 fold", "症例単位のランダムな fold 分割") if legacy
+                                          else ("Inference settings come from the source checkpoint", "推論設定來自來源 checkpoint", "推論設定は元のチェックポイントに由来"))
+                    for section, scope_phrase, provenance_phrase in zip(sections, scope_phrases, provenance_phrases):
+                        self.assertIn(scope_phrase, section)
+                        self.assertIn(provenance_phrase, section)
+                        self.assertIn('`["gray_inner", "_vertical"]`', section)
+                        self.assertIn('`{"bad": 0, "good": 1}`', section)
+                        self.assertIn("resnet18", section)
+                        self.assertIn("8", section)
+                        self.assertIn(code_url, section)
+                        self.assertIn("`config.json`", section)
+                    examples = [re.findall(r"```python\n(.*?)\n```", section, re.DOTALL) for section in sections]
+                    self.assertEqual(len(examples[0]), 1)
+                    self.assertEqual(examples[0], examples[1])
+                    self.assertEqual(examples[1], examples[2])
+                    compile(examples[0][0], "model-card-example", "exec")
 
 
 class RenameCommitTests(unittest.TestCase):

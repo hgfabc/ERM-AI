@@ -341,6 +341,8 @@ End-to-end tests use synthetic data and do not replace performance validation on
 
 ## 12. Publish to GitHub and Hugging Face
 
+The default README pages for the repository, this usage guide, the model collection, and each individual model use English. Links at the top of each page provide Traditional Chinese and Japanese versions. Publishing regenerates the collection and per-model README pages with all three languages.
+
 On Windows, double-click [publish_erm_ai.bat](publish_erm_ai.bat). It forks `ntuhophai/ERM-AI` into the GitHub account authenticated on your computer, commits the new code and documentation, and opens a comparison page where you can manually create a pull request (PR). If the previous publishing branch has no unrelated changes and its PR has not been closed or merged, the script updates that branch so the existing PR includes the changes.
 
 The model stage handles **16 stream conditions × 10 folds = 160 models, plus 7 historical checkpoints, for 167 in total**, and submits them to a single PR in the Hugging Face repository `ntuhophai/ERM-AI` for maintainer review and merging. Each condition/fold has its own directory, weights-only file, configuration, and documentation. The complete collection is published rather than a single selected checkpoint. The original models occupy approximately 43.4 GB, and the first export requires additional disk space. After an interruption, the process can verify the cache and remote contents before resuming.

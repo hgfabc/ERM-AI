@@ -17,7 +17,7 @@
 
 公開程式位於 repo 的 `new/`，包含訓練、驗證、模型目錄與 Hugging Face 推論工具；根目錄另有導覽 README。`old/`、真實影像、病人 manifests、原始 checkpoint、預測結果、環境與暫存不包含在 source 提交中。
 
-GitHub 首頁以英文顯示，頁首提供 **English／繁體中文／日本語** 連結。完整使用說明分別為 `README.md`、`README.zh-TW.md` 與 `README.ja.md`，發布工具會一併提交三個版本。Hugging Face 的首頁模型說明同樣以英文開頭，頁首連結可跳至同一份模型說明中的繁體中文或日文段落。
+GitHub 首頁以英文顯示，頁首提供 **English／繁體中文／日本語** 連結。完整使用說明分別為 `README.md`、`README.zh-TW.md` 與 `README.ja.md`，發布工具會一併提交三個版本。Hugging Face 首頁、各條件／fold 模型及歷史張量封存項目的 README 同樣以英文開頭，頁首連結可跳至同一份說明中的繁體中文或日文段落。單一模型匯出的 README 亦使用相同的三語格式。
 
 更新這些文件後，先執行 `publish_github.bat` 更新 GitHub 發布分支，再執行 `publish_huggingface.bat` 更新 Hugging Face 模型說明；也可執行 `publish_erm_ai.bat` 依序處理兩者。只修改本機檔案不會改變線上內容；GitHub 與 Hugging Face 的 PR 皆須由維護者合併，正式首頁才會顯示更新。Hugging Face 階段仍會核對既有模型快取與遠端內容，相同權重會重用。
 

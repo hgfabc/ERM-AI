@@ -339,6 +339,8 @@ python tools/run_experiments.py --config configs/base.yaml --conditions single_g
 
 ## 12. 發布到 GitHub 與 Hugging Face
 
+儲存庫首頁、本使用說明、模型集合及各個模型的預設 README 均以英文呈現，頁首提供繁體中文與日文切換連結。發布工具會重新產生包含三種語言的模型集合與個別模型說明。
+
 在 Windows 雙擊 [publish_erm_ai.bat](publish_erm_ai.bat)：fork `ntuhophai/ERM-AI` 到本機登入的 GitHub 帳號，提交新版程式與文件，開啟由你手動建立 PR 的比較頁。上次發布分支未遭其他修改且 PR 尚未關閉／合併時，會接續更新它，讓現有 PR 一併顯示更新內容。
 
 模型階段會自動處理 **16 組影像流條件 × 10 折 = 160 個模型，加上 7 個歷史權重，共 167 個**，並提交至 Hugging Face 儲存庫 `ntuhophai/ERM-AI` 的同一個 PR，待維護者審查與合併。各條件／折均有獨立目錄、純權重檔、設定與說明，會發布完整模型集合。原始模型約占 43.4 GB，首次匯出需要額外空間；中斷後可核對快取與遠端內容並接續上傳。
