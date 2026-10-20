@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 import torch
@@ -65,6 +66,43 @@ def test_plan_covers_every_fold_and_historical_extra_without_export(sources):
     assert plan["inference_ready_count"] == 4
     assert plan["historical_count"] == 1
     assert not destination.exists()
+
+
+def test_collection_readme_languages_preserve_navigation_and_model_details():
+    module = _exporter()
+    profiles = module.load_profiles(ROOT / "publish_profiles" / "legacy_collection.yaml")
+    items = [{"inference_ready": True}] * 4 + [{"inference_ready": False}]
+    code_url = "https://github.com/example/ERM-AI/tree/documentation/new"
+    card = module._collection_readme(items, profiles, code_url)
+    _, front_matter, body = card.split("---", 2)
+    assert yaml.safe_load(front_matter)["language"] == ["en", "zh", "ja"]
+    navigation = body.strip().splitlines()[0]
+    assert navigation == "[English](#english) | [繁體中文](#traditional-chinese) | [日本語](#japanese)"
+    targets = re.findall(r"\]\(#([^)]*)\)", navigation)
+    assert targets == re.findall(r'<a id="([^"]+)"></a>', body)
+    sections = re.split(r'<a id="[^"]+"></a>\n\n', body)[1:]
+    assert len(sections) == 3
+    summaries = (
+        "5 model weight files: 4 loadable model/fold entries and 1 historical tensor archive",
+        "5 個模型權重檔案，包含 4 個可載入的模型／fold 項目，以及 1 個歷史張量封存項目",
+        "5 個のモデル重みファイルを保存しています。内訳は、読み込み可能なモデル／fold が 4 件、過去のテンソルアーカイブが 1 件",
+    )
+    for section, summary in zip(sections, summaries):
+        assert summary in section
+        assert "[batch, streams, 3, 448, 448]" in section
+        assert '{"bad": 0, "good": 1}' in section
+        assert "`--revision refs/pr/<number>`" in section
+        assert "`historical/`" in section
+        assert code_url in section
+        assert "Linear(N*2048, 2048)" in section
+        assert "torchvision 0.17.1" in section and "torchvision 0.16.2" in section
+        assert "config2.yaml" in section
+        assert ("antialias=true" if section != sections[0] else "antialias true") in section
+        for name, condition in profiles["conditions"].items():
+            assert f"| {name} | {', '.join(condition['streams'])} | {condition['antialias']} |" in section
+    for condition in profiles["conditions"].values():
+        assert module._collection_profile_note(condition["notes"], "zh") != condition["notes"]
+        assert module._collection_profile_note(condition["notes"], "ja") != condition["notes"]
 
 
 def test_full_collection_and_resume_preserve_weights(sources):

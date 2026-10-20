@@ -116,9 +116,9 @@ function Assert-PublicText([string]$Text, [string]$Name) {
 
 function Get-PublicFiles {
     $selected = New-Object System.Collections.Generic.List[object]
-    $top = @('main.py', 'README.md', '.gitignore', 'requirements.txt', 'requirements-dev.txt', 'requirements-tested.txt',
+    $top = @('main.py', 'README.md', 'README.zh-TW.md', 'README.ja.md', '.gitignore', 'requirements.txt', 'requirements-dev.txt', 'requirements-tested.txt',
              'PUBLISHING.md', 'INFERENCE.md', 'MODEL_CATALOG.md', 'publish_erm_ai.bat', 'publish_github.bat', 'publish_huggingface.bat', 'publish_preview.bat')
-    foreach ($required in @('main.py', 'README.md', '.gitignore', 'requirements.txt', 'requirements-dev.txt', 'PUBLISHING.md')) {
+    foreach ($required in @('main.py', 'README.md', 'README.zh-TW.md', 'README.ja.md', '.gitignore', 'requirements.txt', 'requirements-dev.txt', 'PUBLISHING.md')) {
         if (-not (Test-Path -LiteralPath (Join-Path $CodeRoot $required) -PathType Leaf)) { throw ('Required public source file is missing: ' + $required) }
     }
     foreach ($relative in $top) {
@@ -143,23 +143,33 @@ function Get-PublicFiles {
         if ($relative -notmatch '^[A-Za-z0-9_./-]+$') { throw ('Rename the public file to an ASCII filename: ' + $relative) }
         if ($file.Length -gt 1MB) { throw ('Unexpectedly large source file: ' + $relative) }
         $text = [IO.File]::ReadAllText($full, [Text.Encoding]::UTF8)
-        if ($relative -eq 'README.md') {
+        if ($relative -in @('README.md', 'README.zh-TW.md', 'README.ja.md')) {
             $text = [regex]::Replace($text, '\[([^\]]+)\]\(\.\./old/[^)]+\)', '$1 (local archive; not uploaded)')
-            $text = "# Public source snapshot`n`nLegacy files, datasets, private results and local environments are not included in this repository.`n`n" + $text
+        }
+        if ($relative -eq 'README.md') {
+            # Keep the language selector above the publication notice.
+            $navigationEnd = $text.IndexOf("`n")
+            if ($navigationEnd -lt 0) { throw 'README language navigation is missing.' }
+            $text = $text.Insert($navigationEnd + 1, "`n> Public source snapshot: legacy files, datasets, private results and local environments are not included in this repository.`n")
         }
         Assert-PublicText $text $relative
         $result.Add([pscustomobject]@{ path = ('new/' + $relative); bytes = $Utf8.GetBytes($text) })
     }
+    # Entity labels render in Markdown while keeping this PowerShell 5.1 source ASCII.
     $readme = @'
+[English](README.md) | [&#32321;&#39636;&#20013;&#25991;](new/README.zh-TW.md) | [&#26085;&#26412;&#35486;](new/README.ja.md)
+
 # ERM-AI
 
-Single-stream and multistream OCT research code lives in [`new/`](new/).
+Single-stream and multistream optical coherence tomography (OCT) image classification research code lives in [`new/`](new/). The shared workflow supports one to eight input streams.
 
 - [Usage and experiment workflow](new/README.md)
 - [Windows publishing launcher](new/PUBLISHING.md)
 - [Published model download and inference](new/INFERENCE.md)
 - [All stream/fold models and model architecture](new/MODEL_CATALOG.md)
-- Model repository: https://huggingface.co/ntuhophai/ERM-AI
+- [Hugging Face model repository](https://huggingface.co/ntuhophai/ERM-AI)
+
+The current framework uses patient-grouped outer test folds and inner validation sets for checkpoint selection. Legacy peak validation accuracy is based on a different evaluation protocol and must not be reported as patient-independent test performance.
 
 Windows model publishing defaults to one Hugging Face pull request for the complete collection.
 The repository maintainer reviews and merges it; the launcher never merges the PR.
