@@ -16,6 +16,8 @@ Windows model publishing defaults to one Hugging Face pull request for the compl
 The repository maintainer reviews and merges it; the launcher never merges the PR.
 
 ```powershell
+git clone https://github.com/ntuhophai/ERM-AI.git
+cd ERM-AI
 cd new
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
