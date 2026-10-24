@@ -26,6 +26,22 @@ if ($Case -eq 'source-list') {
         }
     }
     if (-not @($files | Where-Object { $_.path -eq 'new/main.py' })) { throw 'Missing main entry point.' }
+    $publicPaths = @($files | ForEach-Object { $_.path })
+    foreach ($readmePath in @('README.md', 'new/README.md', 'new/README.zh-TW.md', 'new/README.ja.md')) {
+        $readmeFile = @($files | Where-Object { $_.path -ceq $readmePath })
+        if ($readmeFile.Count -ne 1) { throw ('Missing translated README: ' + $readmePath) }
+        $readmeText = $Utf8.GetString($readmeFile[0].bytes)
+        $navigation = ($readmeText -split '\r?\n', 2)[0]
+        $links = [regex]::Matches($navigation, '\[[^\]]+\]\(([^)]+)\)')
+        if ($links.Count -ne 3 -or -not $navigation.StartsWith('[English](README.md)')) {
+            throw ('Missing top-level language selector: ' + $readmePath)
+        }
+        foreach ($link in $links) {
+            $languagePath = if ($readmePath.StartsWith('new/')) { 'new/' + $link.Groups[1].Value } else { $link.Groups[1].Value }
+            if ($languagePath -cnotin $publicPaths) { throw ('Unpublished language link: ' + $readmePath + ' -> ' + $languagePath) }
+        }
+        if ($readmeText -match '\]\(\.\./old/') { throw ('Local archive link in published README: ' + $readmePath) }
+    }
     Write-Host ('Public source list passed: ' + $files.Count + ' files.')
     exit 0
 }

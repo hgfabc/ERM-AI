@@ -428,64 +428,102 @@ def _public_code_url(value):
     return value
 
 
-def _model_card(metadata, code_url=None):
+def _multilingual_card(render_section, tags):
+    """Render one English-first README with stable same-file language links."""
+    header = "---\nlanguage:\n- en\n- zh\n- ja\ntags:\n"
+    header += "".join("- " + tag + "\n" for tag in tags)
+    header += ("---\n\n[English](#english) | [繁體中文](#traditional-chinese) | "
+               "[日本語](#japanese)\n\n")
+    sections = []
+    for language, anchor in (("en", "english"), ("zh", "traditional-chinese"), ("ja", "japanese")):
+        sections.append('<a id="' + anchor + '"></a>\n\n' + render_section(language).rstrip() + "\n")
+    return header + "\n---\n\n".join(sections)
+
+
+def _model_card_section(metadata, code_url=None, language="en", loading=None):
+    def text(english, chinese, japanese):
+        return {"en": english, "zh": chinese, "ja": japanese}[language]
+
     order = json.dumps(metadata["streams"], ensure_ascii=False)
     classes = json.dumps(metadata["class_to_idx"], ensure_ascii=False)
     model = metadata["model_config"]
     kind = metadata["artifact_kind"]
     if kind == "demo":
-        scope = ("This is a demo/smoke-test artifact. It is not a formally trained "
-                 "ophthalmology model. Demo metrics are software checks, not clinical results.")
+        scope = text(
+            "This is a demo/smoke-test artifact. It is not a formally trained ophthalmology model. Demo metrics are software checks, not clinical results.",
+            "這是示範／冒煙測試用產物，並非正式訓練的眼科模型。示範指標僅用於檢查軟體，不代表臨床結果。",
+            "これはデモ／スモークテスト用の成果物であり、正式に学習した眼科モデルではありません。デモの指標はソフトウェアの確認結果であり、臨床成績ではありません。")
     else:
-        scope = ("This is a research artifact. This export does not establish whether "
-                 "training used real or synthetic data, independent validation, or clinical readiness.")
+        scope = text(
+            "This is a research artifact. This export does not establish whether training used real or synthetic data, independent validation, or clinical readiness.",
+            "這是研究用產物。本次匯出無法證實訓練採用真實或合成資料、是否經過獨立驗證，或是否已具備臨床應用條件。",
+            "これは研究用の成果物です。このエクスポートによって、学習データが実データか合成データか、独立した検証が行われたか、臨床利用の準備が整っているかを確認することはできません。")
     if metadata["legacy_no_split_metadata"]:
-        limitations = (
+        limitations = text(
             "The source is a legacy model. Architecture and tensor keys/shapes were checked strictly, "
             "but the historical stream order, label meaning and preprocessing cannot be proved from "
             "weights. These settings were supplied by the operator. Earlier experiments used "
             "case-level random folds with identified patient-overlap concerns and selected epochs "
             "on validation accuracy. Their scores must not be presented as independent "
-            "patient-grouped cross-validation results. Converted format does not correct those experiments."
-        )
+            "patient-grouped cross-validation results. Converted format does not correct those experiments.",
+            "來源為歷史模型。已嚴格核對架構、張量鍵與形狀，但無法僅憑權重證實歷史輸入流順序、標籤意義及前處理方式；這些設定由操作者提供。早期實驗採用病例層級的隨機 fold，已發現跨 fold 病人重疊的疑慮，並依驗證準確率選取 epoch。不得將其分數稱為以病人分組且彼此獨立的交叉驗證結果。格式轉換不會修正原實驗的這些問題。",
+            "変換元は過去のモデルです。モデル構造、テンソルのキーと形状を厳密に確認していますが、過去のストリーム順序、ラベルの意味、前処理は重みだけでは証明できません。これらの設定は操作者が提供したものです。初期の実験では症例単位のランダムな fold 分割を用い、fold 間で患者が重複する懸念が確認されており、検証正解率に基づいて epoch を選択していました。これらのスコアを、患者単位で分割された独立した交差検証の結果と表記しないでください。形式を変換しても、元の実験の問題は修正されません。")
     else:
-        limitations = (
+        limitations = text(
             "Inference settings come from the source checkpoint. Private training partitions and "
             "dataset provenance are deliberately omitted. No training-data or performance claim is "
-            "made by this export; substantiate any such claim using the original private experiment records."
-        )
-    code = ("\nPublic code: " + code_url + "\n") if code_url else ""
+            "made by this export; substantiate any such claim using the original private experiment records.",
+            "推論設定來自來源 checkpoint。公開匯出刻意省略私有訓練分割與資料集來源資訊。本次匯出不對訓練資料或模型效能作出任何主張；如需提出相關主張，須以原始非公開實驗紀錄佐證。",
+            "推論設定は元のチェックポイントに由来します。非公開の学習データ分割とデータセットの来歴は、意図的に省略しています。このエクスポートでは、学習データや性能に関する主張は行いません。そのような主張には、元の非公開実験記録による裏付けが必要です。")
+    code = ""
+    if code_url:
+        code = text("Public code: ", "公開程式碼：", "公開コード：") + "[GitHub](" + code_url + ")\n\n"
+    if loading is None:
+        example = (
+            "```python\nfrom pathlib import Path\nimport sys, torch\n"
+            'bundle = Path("downloaded_model").resolve()\n'
+            "sys.path.insert(0, str(bundle))\n"
+            "from modeling_multistream import load_public_model, preprocess_streams\n"
+            'model = load_public_model(bundle, device="cpu")\n'
+            "# Replace these paths with matching images, preserving stream order.\n"
+            'image_paths = [str(Path("my_images") / (stream + ".jpg"))\n'
+            "               for stream in model.streams]\n"
+            "images = preprocess_streams(image_paths, model.preprocessing)\n"
+            "with torch.no_grad():\n"
+            "    probabilities = torch.softmax(model(images), dim=1)\n```\n\n")
+        loading = text("## Loading\n\n", "## 載入模型\n\n", "## モデルの読み込み\n\n") + text(
+            "Install the dependencies in `requirements.txt` and place the exported files in one directory. The public loader uses safetensors and never asks for private patient metadata.\n\n",
+            "請安裝 `requirements.txt` 中的相依套件，並將匯出檔案放在同一個目錄。公開載入器使用 safetensors，不需要任何私有病人資料。\n\n",
+            "`requirements.txt` の依存パッケージをインストールし、エクスポートされたファイルを同じディレクトリに配置してください。公開ローダーは safetensors を使用し、非公開の患者メタデータを要求しません。\n\n") + example + text(
+            "Inputs have shape [batch, streams, 3, height, width]. Generic single-image Transformers pipelines are not a loader for this custom multistream architecture.\n\n",
+            "輸入形狀為 [batch, streams, 3, height, width]。一般的單張影像 Transformers pipeline 無法直接載入此自訂多流架構。\n\n",
+            "入力の形状は [batch, streams, 3, height, width] です。一般的な単一画像用の Transformers パイプラインでは、この独自のマルチストリーム構造を読み込むことはできません。\n\n")
     return (
-        "---\ntags:\n- pytorch\n- timm\n- multistream\n- image-classification\n"
-        f"- {kind}\n---\n\n# Multistream model artifact\n\n{scope}\n\n"
-        f"Architecture: {model['name']}; hidden dimension: {model['hidden_dim']}.\n\n"
-        f"Ordered streams: {order}\n\nClass mapping: {classes}\n\n"
-        "Class names are labels only; do not infer healthy/diseased semantics without the study definition.\n\n"
-        f"{limitations}\n\n{code}"
-        "## Loading\n\nInstall the dependencies in requirements.txt and place the exported files "
-        "in one directory. The public loader uses safetensors and never asks for private patient metadata.\n\n"
-        "    from pathlib import Path\n"
-        "    import sys, torch\n"
-        "    bundle = Path(\"downloaded_model\").resolve()\n"
-        "    sys.path.insert(0, str(bundle))\n"
-        "    from modeling_multistream import load_public_model, preprocess_streams\n"
-        "    model = load_public_model(bundle, device=\"cpu\")\n"
-        "    # Replace these paths with matching images, preserving stream order.\n"
-        "    image_paths = [str(Path(\"my_images\") / (stream + \".jpg\"))\n"
-        "                   for stream in model.streams]\n"
-        "    images = preprocess_streams(image_paths, model.preprocessing)\n"
-        "    with torch.no_grad():\n"
-        "        probabilities = torch.softmax(model(images), dim=1)\n\n"
-        "Inputs have shape [batch, streams, 3, height, width]. Generic single-image Transformers "
-        "pipelines are not a loader for this custom multistream architecture.\n\n"
-        "## Preprocessing and verification\n\n"
-        "config.json records the RGB resize backend, bilinear interpolation, center crop and normalization. "
-        "For raw legacy exports, verify these operator-supplied settings against the original experiment. "
-        "Export verification checks every tensor key and shape and rejects nonfinite floating-point weights; "
-        "it does not run inference or validate performance.\n\n"
-        "## License\n\nNo model license was inferred by the exporter. Supply the authorized model "
-        "license and complete the study-specific model card before treating this as a documented release.\n"
-    )
+        text("# Multistream model artifact", "# 多流模型產物", "# マルチストリームモデルの成果物") + "\n\n" + scope + "\n\n"
+        + text(f"Architecture: {model['name']}; hidden dimension: {model['hidden_dim']}.",
+               f"模型架構：{model['name']}；隱藏維度：{model['hidden_dim']}。",
+               f"モデル構造：{model['name']}。隠れ次元数：{model['hidden_dim']}。") + "\n\n"
+        + text(f"Ordered streams: `{order}`\n\nClass mapping: `{classes}`",
+               f"輸入流順序：`{order}`\n\n類別對應：`{classes}`",
+               f"ストリームの順序：`{order}`\n\nクラスの対応関係：`{classes}`") + "\n\n"
+        + text("Class names are labels only; do not infer healthy/diseased semantics without the study definition.",
+               "類別名稱僅為標籤；未取得研究定義前，不得將其直接解讀為健康／患病。",
+               "クラス名はラベルです。研究上の定義を確認せずに、健康／疾患を意味すると解釈しないでください。") + "\n\n"
+        + limitations + "\n\n" + code + loading
+        + text("## Preprocessing and verification\n\n", "## 前處理與核對\n\n", "## 前処理と確認\n\n")
+        + text("`config.json` records the RGB resize backend, bilinear interpolation, center crop and normalization. For raw legacy exports, verify these operator-supplied settings against the original experiment. Export verification checks every tensor key and shape and rejects nonfinite floating-point weights; it does not run inference or validate performance.",
+               "`config.json` 記錄 RGB 影像縮放後端、雙線性插值、中心裁切與正規化方式。若匯出原始歷史權重，須依原始實驗核對操作者提供的設定。匯出核對會檢查每個張量鍵與形狀，並拒絕含非有限浮點數的權重；不會執行推論或驗證效能。",
+               "`config.json` に RGB 画像のリサイズ処理、双線形補間、中央クロップ、正規化を記録しています。旧形式の重みをエクスポートする場合は、操作者が提供した設定を元の実験と照合してください。エクスポート時の確認では、すべてのテンソルのキーと形状を検査し、非有限の浮動小数点値を含む重みを拒否します。推論や性能検証は実施しません。") + "\n\n"
+        + text("## License\n\n", "## 授權\n\n", "## ライセンス\n\n")
+        + text("No model license was inferred by the exporter. Supply the authorized model license and complete the study-specific model card before treating this as a documented release.",
+               "匯出器未推定或擅自指定模型授權。將本產物視為具完整文件的發布版本前，須提供經授權的模型授權條款，並完成該研究的模型卡。",
+               "エクスポーターはモデルのライセンスを推測に基づいて指定していません。文書を整備した公開版として扱う前に、正当に許諾されたモデルのライセンスを提示し、本研究固有のモデルカードを完成させてください。") + "\n")
+
+
+def _model_card(metadata, code_url=None):
+    return _multilingual_card(
+        lambda language: _model_card_section(metadata, code_url, language),
+        ("pytorch", "timm", "multistream", "image-classification", metadata["artifact_kind"]))
 
 
 def _rename_with_retry(source, target):

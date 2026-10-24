@@ -1,12 +1,16 @@
+[English](README.md) | [&#32321;&#39636;&#20013;&#25991;](new/README.zh-TW.md) | [&#26085;&#26412;&#35486;](new/README.ja.md)
+
 # ERM-AI
 
-Single-stream and multistream OCT research code lives in [`new/`](new/).
+Single-stream and multistream optical coherence tomography (OCT) image classification research code lives in [`new/`](new/). The shared workflow supports one to eight input streams.
 
 - [Usage and experiment workflow](new/README.md)
 - [Windows publishing launcher](new/PUBLISHING.md)
 - [Published model download and inference](new/INFERENCE.md)
 - [All stream/fold models and model architecture](new/MODEL_CATALOG.md)
-- Model repository: https://huggingface.co/ntuhophai/ERM-AI
+- [Hugging Face model repository](https://huggingface.co/ntuhophai/ERM-AI)
+
+The current framework uses patient-grouped outer test folds and inner validation sets for checkpoint selection. Legacy peak validation accuracy is based on a different evaluation protocol and must not be reported as patient-independent test performance.
 
 Windows model publishing defaults to one Hugging Face pull request for the complete collection.
 The repository maintainer reviews and merges it; the launcher never merges the PR.

@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 import torch
@@ -67,6 +68,91 @@ def test_plan_covers_every_fold_and_historical_extra_without_export(sources):
     assert not destination.exists()
 
 
+def test_collection_readme_languages_preserve_navigation_and_model_details():
+    module = _exporter()
+    profiles = module.load_profiles(ROOT / "publish_profiles" / "legacy_collection.yaml")
+    items = [{"inference_ready": True}] * 4 + [{"inference_ready": False}]
+    code_url = "https://github.com/example/ERM-AI/tree/documentation/new"
+    card = module._collection_readme(items, profiles, code_url)
+    _, front_matter, body = card.split("---", 2)
+    assert yaml.safe_load(front_matter)["language"] == ["en", "zh", "ja"]
+    navigation = body.strip().splitlines()[0]
+    assert navigation == "[English](#english) | [繁體中文](#traditional-chinese) | [日本語](#japanese)"
+    targets = re.findall(r"\]\(#([^)]*)\)", navigation)
+    assert targets == re.findall(r'<a id="([^"]+)"></a>', body)
+    sections = re.split(r'<a id="[^"]+"></a>\n\n', body)[1:]
+    assert len(sections) == 3
+    summaries = (
+        "5 model weight files: 4 loadable model/fold entries and 1 historical tensor archive",
+        "5 個模型權重檔案，包含 4 個可載入的模型／fold 項目，以及 1 個歷史張量封存項目",
+        "5 個のモデル重みファイルを保存しています。内訳は、読み込み可能なモデル／fold が 4 件、過去のテンソルアーカイブが 1 件",
+    )
+    for section, summary in zip(sections, summaries):
+        assert summary in section
+        assert "[batch, streams, 3, 448, 448]" in section
+        assert '{"bad": 0, "good": 1}' in section
+        assert "`--revision refs/pr/<number>`" in section
+        assert "`historical/`" in section
+        assert code_url in section
+        assert "Linear(N*2048, 2048)" in section
+        assert "torchvision 0.17.1" in section and "torchvision 0.16.2" in section
+        assert "config2.yaml" in section
+        assert ("antialias=true" if section != sections[0] else "antialias true") in section
+        for name, condition in profiles["conditions"].items():
+            assert f"| {name} | {', '.join(condition['streams'])} | {condition['antialias']} |" in section
+    for condition in profiles["conditions"].values():
+        assert module._collection_profile_note(condition["notes"], "zh") != condition["notes"]
+        assert module._collection_profile_note(condition["notes"], "ja") != condition["notes"]
+
+
+def _language_sections(card):
+    _, front_matter, body = card.split("---", 2)
+    assert yaml.safe_load(front_matter)["language"] == ["en", "zh", "ja"]
+    navigation = body.strip().splitlines()[0]
+    assert navigation == "[English](#english) | [繁體中文](#traditional-chinese) | [日本語](#japanese)"
+    assert re.findall(r"\]\(#([^)]*)\)", navigation) == re.findall(r'<a id="([^"]+)"></a>', body)
+    sections = re.split(r'<a id="[^"]+"></a>\n\n', body)[1:]
+    assert len(sections) == 3
+    return sections
+
+
+def test_collection_leaf_languages_keep_shared_loader_and_matching_commands():
+    module = _exporter()
+    profiles = module.load_profiles(ROOT / "publish_profiles" / "legacy_collection.yaml")
+    metadata = module._ready_metadata(profiles, "fusion_8")
+    item = {"condition": "fusion_8", "fold": 3}
+    code_url = "https://github.com/example/ERM-AI/tree/public/new"
+    card = module._collection_model_card(metadata, item, profiles, code_url)
+    sections = _language_sections(card)
+    assert "from modeling_multistream" not in card and "downloaded_model" not in card
+    assert "shared loader" in sections[0]
+    for section in sections:
+        assert "--condition fusion_8 --fold 3" in section
+        assert "`--revision refs/pr/<number>`" in section
+        assert json.dumps(metadata["streams"]) in section
+        assert "`fusion_8`" in section and "`3`" in section
+        assert "https://github.com/example/ERM-AI/blob/public/new/INFERENCE.md" in section
+        assert "torchvision 0.16.2" in section
+    commands = [re.findall(r"```bash\n(.*?)\n```", section, re.DOTALL) for section in sections]
+    assert len(commands[0]) == 1 and commands[0] == commands[1] == commands[2]
+    settings = [re.findall(r"```json\n(.*?)\n```", section, re.DOTALL) for section in sections]
+    assert len(settings[0]) == 1 and settings[0] == settings[1] == settings[2]
+    assert json.loads(settings[0][0]) == metadata["preprocessing"]
+
+
+def test_historical_card_languages_limit_inference_claims_to_archive_entries():
+    module = _exporter()
+    config = module._historical_config({"condition": "unidentified-project"})
+    sections = _language_sections(module._historical_card(config))
+    for section in sections:
+        assert "`unidentified-project`" in section
+        assert "`historical/`" in section
+        assert "fold" in section
+        assert "```" not in section and "--condition" not in section
+    for section, scope in zip(sections, ("No fold, stream order", "未宣告其 fold、輸入流順序", "fold、ストリームの順序")):
+        assert scope in section
+
+
 def test_full_collection_and_resume_preserve_weights(sources):
     module = _exporter()
     records, profiles, destination = sources
@@ -80,6 +166,7 @@ def test_full_collection_and_resume_preserve_weights(sources):
     for entry in catalog["models"]:
         leaf = destination / entry["path"]
         assert {path.name for path in leaf.iterdir()} == module.LEAF_FILES
+        _language_sections((leaf / "README.md").read_text(encoding="utf-8"))
     historical = json.loads((destination / "historical/unidentified-project/config.json").read_text())
     assert historical["streams"] is None and historical["inference_ready"] is False
     assert historical["model_config"] is None
@@ -87,7 +174,7 @@ def test_full_collection_and_resume_preserve_weights(sources):
     assert resumed["reused"] == 5 and resumed["exported"] == 0
     second = json.loads((destination / "catalog.json").read_text())
     assert hashes == {entry["path"]: entry["weights_sha256"] for entry in second["models"]}
-    assert "new-version" in (destination / "models/single_gray_inner/fold_0/README.md").read_text()
+    assert "new-version" in (destination / "models/single_gray_inner/fold_0/README.md").read_text(encoding="utf-8")
     assert not (destination / "state.json").exists()
 
 

@@ -14,7 +14,7 @@ import uuid
 import yaml
 
 from export_public_model import (
-    PUBLIC_LOADER, _class_mapping, _model_card, _ordered_streams,
+    PUBLIC_LOADER, _class_mapping, _model_card_section, _multilingual_card, _ordered_streams,
     _public_code_url, _public_preprocessing, _safe_model_config,
     _tensor_state, _rename_with_retry, export_public_model,
 )
@@ -170,11 +170,25 @@ def _historical_config(item):
 
 
 def _historical_card(config):
-    return ("# Historical tensor archive\n\nCondition: " + config["condition"] + "\n\n"
-            "These original tensors are preserved for research provenance. No fold, stream order, "
-            "label mapping or preprocessing is asserted.\n\n" + config["reason"] + "\n\n"
-            "The collection inference tool rejects this entry. Recover the original experiment "
-            "settings before constructing an inference model. No patient/sample metadata is included.\n")
+    def section(language):
+        def text(english, chinese, japanese):
+            return {"en": english, "zh": chinese, "ja": japanese}[language]
+
+        reason = config["reason"]
+        if reason == "Original fold/stream/preprocessing metadata is unavailable; archive tensors without guessing a deployment configuration.":
+            reason = text(reason,
+                          "原始 fold／輸入流／前處理資訊已不可取得；因此僅封存張量，不推測部署設定。",
+                          "元の fold／ストリーム／前処理のメタデータが利用できないため、推論用の設定を推測せず、テンソルのみを保存しています。")
+        return (text("# Historical tensor archive", "# 歷史張量封存項目", "# 過去のテンソルアーカイブ") + "\n\n"
+                + text("Condition: ", "條件：", "条件：") + "`" + config["condition"] + "`\n\n"
+                + text("These original tensors are preserved for research provenance. No fold, stream order, label mapping or preprocessing is asserted.",
+                       "保存這些原始張量是為了保留研究來源紀錄，並未宣告其 fold、輸入流順序、類別對應或前處理設定。",
+                       "研究の来歴を保持するために元のテンソルを保存しています。fold、ストリームの順序、クラスの対応関係、前処理の設定は宣言していません。") + "\n\n" + reason + "\n\n"
+                + text("The collection inference tool rejects this archive entry under `historical/`. Recover the original experiment settings before constructing an inference model. No patient/sample metadata is included.",
+                       "集合推論工具不接受此 `historical/` 下的封存項目。建立可用於推論的模型前，須先找回原始實驗設定。本項目不包含病人或樣本資訊。",
+                       "コレクションの推論ツールは、`historical/` 配下のこのアーカイブ項目を受け付けません。推論モデルを構築するには、元の実験設定を復元する必要があります。患者やサンプルのメタデータは含まれていません。") + "\n")
+
+    return _multilingual_card(section, ("pytorch", "research", "tensor-archive"))
 
 
 def _ready_metadata(profiles, name):
@@ -188,74 +202,182 @@ def _ready_metadata(profiles, name):
             "legacy_no_split_metadata": True}
 
 
-def _collection_readme(items, profiles, code_url=None):
+def _collection_profile_note(note, language):
+    """Translate documented profile evidence without reinterpreting unknown notes."""
+    if not note:
+        return {"en": "Operator-declared settings", "zh": "由操作者明確宣告的設定", "ja": "操作者が明示的に宣言した設定"}[language]
+    if language == "en":
+        return note
+    translations = {
+        "Single-stream environment records use torchvision 0.17.1; exact per-fold environment snapshots were not retained.": (
+            "單流環境紀錄使用 torchvision 0.17.1；未保留各 fold 的完整環境快照。",
+            "単一ストリームの環境記録では torchvision 0.17.1 を使用しています。fold ごとの正確な環境スナップショットは保存されていません。"),
+        "Order follows historical inference directory naming; original YAML is missing. Two-stream runtime records use torchvision 0.17.1.": (
+            "順序依歷史推論目錄名稱判定；原始 YAML 已缺失。雙流執行環境紀錄使用 torchvision 0.17.1。",
+            "順序は過去の推論ディレクトリ名に基づきます。元の YAML は残っていません。2 ストリームの実行環境記録では torchvision 0.17.1 を使用しています。"),
+        "Order follows saved config2.yaml; two-stream runtime records use torchvision 0.17.1.": (
+            "順序依保存的 config2.yaml；雙流執行環境紀錄使用 torchvision 0.17.1。",
+            "順序は保存された config2.yaml に基づきます。2 ストリームの実行環境記録では torchvision 0.17.1 を使用しています。"),
+        "Order follows saved config3.yaml; two-stream runtime records use torchvision 0.17.1.": (
+            "順序依保存的 config3.yaml；雙流執行環境紀錄使用 torchvision 0.17.1。",
+            "順序は保存された config3.yaml に基づきます。2 ストリームの実行環境記録では torchvision 0.17.1 を使用しています。"),
+        "Order follows saved config4.yaml; three-stream runtime records use torchvision 0.17.1.": (
+            "順序依保存的 config4.yaml；三流執行環境紀錄使用 torchvision 0.17.1。",
+            "順序は保存された config4.yaml に基づきます。3 ストリームの実行環境記録では torchvision 0.17.1 を使用しています。"),
+        "Order follows saved config5.yaml; three-stream runtime records use torchvision 0.17.1.": (
+            "順序依保存的 config5.yaml；三流執行環境紀錄使用 torchvision 0.17.1。",
+            "順序は保存された config5.yaml に基づきます。3 ストリームの実行環境記録では torchvision 0.17.1 を使用しています。"),
+        "Order follows historical inference directory naming. Original runtime version is unrecorded; antialias true is an explicit operator choice to verify.": (
+            "順序依歷史推論目錄名稱判定。原始執行環境版本未記錄；antialias=true 是操作者明確指定、仍須核對的設定。",
+            "順序は過去の推論ディレクトリ名に基づきます。元の実行環境のバージョンは記録されていません。antialias=true は操作者が明示的に選択した設定であり、照合が必要です。"),
+        "Order follows saved config.yaml; saved eight-stream environment uses torchvision 0.16.2, whose Tensor Resize default was not antialiased.": (
+            "順序依保存的 config.yaml；保存的八流環境使用 torchvision 0.16.2，其張量 Resize 預設不啟用抗鋸齒。",
+            "順序は保存された config.yaml に基づきます。保存された 8 ストリーム環境では torchvision 0.16.2 を使用しており、テンソルの Resize は既定でアンチエイリアスを適用しません。"),
+    }
+    if note in translations:
+        return translations[note][0 if language == "zh" else 1]
+    prefix = {"zh": "原始設定註記（保留原文）：", "ja": "元の設定注記（原文を保持）："}[language]
+    return prefix + note
+
+
+def _collection_readme_section(items, profiles, code_url=None, language="en"):
+    def text(english, chinese, japanese):
+        return {"en": english, "zh": chinese, "ja": japanese}[language]
+
     ready = sum(item["inference_ready"] for item in items)
+    historical = len(items) - ready
     first = next(iter(profiles["conditions"]))
     metadata = _ready_metadata(profiles, first)
     preprocessing = metadata["preprocessing"]
     model = metadata["model_config"]
-    architecture = ("Single-stream ResNet50 maps a global pooled 2048-dimensional feature to two classes. Fusion models concatenate one feature per stream and use Linear(N*2048, 2048), ReLU, Linear(2048, 2048), and Linear(2048, 2)."
-                    if model["name"] == "resnet50" and model["hidden_dim"] == 2048 and len(metadata["class_to_idx"]) == 2
-                    else "Declared backbone: " + model["name"] + "; fusion hidden dimension: " + str(model["hidden_dim"]) + ". Each config.json describes its architecture.")
-    lines = ["---", "tags:", "- pytorch", "- timm", "- multistream", "- research", "---", "",
-             "# ERM-AI complete research model collection", "",
-             f"This collection preserves {len(items)} model files: {ready} loadable model/fold entries and {len(items)-ready} historical tensor archives.",
-             "A loadable entry means that its tensors match the declared architecture; it does not establish clinical validity or independent test performance.", "",
-             "## Layout", "", "```text", "catalog.json", "modeling_multistream.py", "README.md", "requirements.txt",
+    architecture = (text(
+        "Single-stream ResNet50 maps a global pooled 2048-dimensional feature to two classes. Fusion models concatenate one feature per stream and use Linear(N*2048, 2048), ReLU, Linear(2048, 2048), and Linear(2048, 2).",
+        "單流 ResNet50 將全域池化後的 2048 維特徵映射至兩個類別。融合模型串接各輸入流的特徵，再依序使用 Linear(N*2048, 2048)、ReLU、Linear(2048, 2048) 與 Linear(2048, 2)。",
+        "単一ストリームの ResNet50 は、グローバルプーリング後の 2048 次元特徴を 2 クラスに写像します。融合モデルは各ストリームの特徴を連結し、Linear(N*2048, 2048)、ReLU、Linear(2048, 2048)、Linear(2048, 2) を順に適用します。")
+        if model["name"] == "resnet50" and model["hidden_dim"] == 2048 and len(metadata["class_to_idx"]) == 2
+        else text(
+            f"Declared backbone: {model['name']}; fusion hidden dimension: {model['hidden_dim']}. Each `config.json` describes its architecture.",
+            f"宣告的骨幹網路：{model['name']}；融合層隱藏維度：{model['hidden_dim']}。各 `config.json` 記錄對應的模型架構。",
+            f"宣言されたバックボーン：{model['name']}。融合層の隠れ次元数：{model['hidden_dim']}。各 `config.json` に対応するモデル構造が記録されています。"))
+    lines = [text("# ERM-AI complete research model collection", "# ERM-AI 完整研究模型集合", "# ERM-AI 研究モデルの完全コレクション"), "",
+             text(f"This collection preserves {len(items)} model weight {'file' if len(items) == 1 else 'files'}: {ready} loadable model/fold {'entry' if ready == 1 else 'entries'} and {historical} historical tensor {'archive' if historical == 1 else 'archives'}.",
+                  f"本集合保存 {len(items)} 個模型權重檔案，包含 {ready} 個可載入的模型／fold 項目，以及 {len(items)-ready} 個歷史張量封存項目。",
+                  f"本コレクションには {len(items)} 個のモデル重みファイルを保存しています。内訳は、読み込み可能なモデル／fold が {ready} 件、過去のテンソルアーカイブが {len(items)-ready} 件です。"),
+             text("A loadable entry means that its tensors match the declared architecture; it does not establish clinical validity or independent test performance.",
+                  "「可載入」僅表示張量符合宣告的模型架構，不代表已證實臨床有效性或獨立測試效能。",
+                  "「読み込み可能」とは、テンソルが宣言されたモデル構造に適合することを意味します。臨床的妥当性や独立したテストでの性能が確認されたことを意味するものではありません。"), "",
+             text("## Layout", "## 目錄結構", "## ディレクトリ構成"), "", "```text", "catalog.json", "modeling_multistream.py", "README.md", "requirements.txt",
              "models/<condition>/fold_<0-9>/{model.safetensors,config.json,README.md}",
              "historical/<project>/{model.safetensors,config.json,README.md}", "```", "",
-             "## Conditions and ordered streams", "", "| Condition | Ordered streams | Tensor resize antialias | Profile evidence / limits |", "|---|---|---|---|"]
+             text("## Conditions and ordered streams", "## 實驗條件與輸入流順序", "## 実験条件とストリームの順序"), "",
+             text("| Condition | Ordered streams | Tensor resize antialias | Profile evidence / limits |",
+                  "| 條件 | 輸入流順序 | 張量縮放抗鋸齒 | 設定依據／限制 |",
+                  "| 条件 | ストリームの順序 | テンソルのリサイズ時のアンチエイリアス | 設定の根拠／制約 |"), "|---|---|---|---|"]
     for name, value in profiles["conditions"].items():
-        note = value.get("notes", "Operator-declared settings").replace("|", "/")
+        note = _collection_profile_note(value.get("notes"), language).replace("|", "/")
         lines.append(f"| {name} | {', '.join(value['streams'])} | {value['antialias']} | {note} |")
-    lines += ["", "Each condition contains the zero-based folds declared in catalog.json. Each stream has its own ResNet50 backbone; fusion concatenates pooled features and applies an MLP classifier. Single-stream models classify the pooled feature directly.",
-              "", "## Architecture and preprocessing", "",
+    lines += ["", text(
+              "Each condition contains the zero-based folds declared in `catalog.json`. Each stream has its own backbone; fusion concatenates pooled features and applies an MLP classifier. Single-stream models classify the pooled feature directly.",
+              "各條件包含 `catalog.json` 宣告的 fold，編號從 0 開始。各輸入流使用獨立的骨幹網路；融合模型串接池化後的特徵，再以多層感知器（MLP）分類。單流模型則直接以池化後的特徵分類。",
+              "各条件には、`catalog.json` に宣言された 0 始まりの fold が含まれます。各ストリームは独立したバックボーンを持ち、融合モデルはプーリング後の特徴を連結して多層パーセプトロン（MLP）で分類します。単一ストリームモデルはプーリング後の特徴を直接分類します。"),
+              "", text("## Architecture and preprocessing", "## 模型架構與前處理", "## モデル構造と前処理"), "",
               architecture,
-              f"Input tensors have shape [batch, streams, 3, {preprocessing['image_size']}, {preprocessing['image_size']}]. Class mapping: {json.dumps(metadata['class_to_idx'])}. Softmax converts logits into class probabilities.",
-              "RGB resize backend: " + preprocessing["resize_backend"] + "; resize size: " + str(preprocessing["resize_size"]) + "; bilinear interpolation and center crop. Normalization mean: " + str(preprocessing["mean"]) + "; std: " + str(preprocessing["std"]) + ". Condition-specific antialias is listed above and saved in config.json.",
-              "", "## Inference", "", "Clone the code repository and run from its new/ directory:", "", "```bash",
+              text(f"Input tensors have shape [batch, streams, 3, {preprocessing['image_size']}, {preprocessing['image_size']}]. Class mapping: {json.dumps(metadata['class_to_idx'])}. Softmax converts logits into class probabilities.",
+                   f"輸入張量形狀為 [batch, streams, 3, {preprocessing['image_size']}, {preprocessing['image_size']}]。類別對應：{json.dumps(metadata['class_to_idx'])}。使用 softmax 將 logits 轉為各類別機率。",
+                   f"入力テンソルの形状は [batch, streams, 3, {preprocessing['image_size']}, {preprocessing['image_size']}] です。クラスの対応関係：{json.dumps(metadata['class_to_idx'])}。softmax で logits を各クラスの確率に変換します。"),
+              text(f"RGB resize backend: {preprocessing['resize_backend']}; resize size: {preprocessing['resize_size']}; bilinear interpolation and center crop. Normalization mean: {preprocessing['mean']}; std: {preprocessing['std']}. Condition-specific antialias is listed above and saved in `config.json`.",
+                   f"RGB 影像縮放後端：{preprocessing['resize_backend']}；縮放尺寸：{preprocessing['resize_size']}；使用雙線性插值與中心裁切。正規化平均值：{preprocessing['mean']}；標準差：{preprocessing['std']}。各條件的抗鋸齒設定列於上表，並保存在 `config.json`。",
+                   f"RGB 画像のリサイズ処理：{preprocessing['resize_backend']}。リサイズサイズ：{preprocessing['resize_size']}。双線形補間と中央クロップを使用します。正規化の平均値：{preprocessing['mean']}。標準偏差：{preprocessing['std']}。条件ごとのアンチエイリアス設定は上表と `config.json` に記録されています。"),
+              "", text("## Inference", "## 推論", "## 推論"), "",
+              text("Clone the code repository and run from its `new/` directory:", "複製程式碼儲存庫後，在其中的 `new/` 目錄執行：", "コードリポジトリをクローンし、`new/` ディレクトリで実行してください。"), "", "```bash",
               "python -m pip install -r requirements.txt",
               "python tools/infer_published.py --repo ntuhophai/ERM-AI --list",
               "python tools/infer_published.py --repo ntuhophai/ERM-AI --condition single_gray_inner --fold 0 --root /path/to/cases --output predictions/single_gray_inner_fold0",
               "python tools/infer_published.py --repo ntuhophai/ERM-AI --condition fusion_8 --all-folds --root /path/to/cases --output predictions/fusion_8",
               "```", "",
-              "Before the model PR is merged, add --revision refs/pr/<number> to every Hub command above. After merge, the default main revision can be used. Wait for all models and catalog.json to finish uploading before inference.",
-              "Only selected fold weights/configurations are downloaded. Pin --revision to a model repository commit for reproducible downloads. Predictions include per-class probabilities in the saved class index order.",
-              "Case folders must provide one matching image per required stream. Both class/case/image folders and unlabeled case/image folders are supported.",
-              "Use --ensemble only when you explicitly want a mean of the selected models' probabilities. This is prediction on one cohort, not out-of-fold validation.", "",
-              "Historical entries are tensor-only because their original fold/stream settings were not saved. They are included for completeness but are not automatically inferable.",
-              "", "## Provenance and limits", "",
-              "These are legacy research weights. Earlier experiments used case-level random folds, with identified patient-overlap concerns, and selected checkpoints using validation scores. Do not label those scores as patient-independent cross-validation results.",
-              "Class names bad/good are recorded labels; do not infer healthy/diseased meanings without the study definition.",
-              "Profiles are explicit declarations; tensor keys/shapes cannot prove historical stream semantics or preprocessing. In particular, four-/six-stream runtime versions were not retained; their antialias choice must be checked against original records.",
-              "No model license was guessed. Complete the study-specific model documentation/license before treating this as a clinical release."]
+              text("Before the model PR is merged, add `--revision refs/pr/<number>` to every Hub command above. After merge, the default `main` revision can be used. Wait for all models and `catalog.json` to finish uploading before inference.",
+                   "模型 PR 合併前，請在上述每個存取 Hub 的指令加上 `--revision refs/pr/<number>`；合併後可使用預設的 `main` 版本。請等所有模型與 `catalog.json` 上傳完成後再執行推論。",
+                   "モデルの PR がマージされる前は、上記の Hub にアクセスする各コマンドに `--revision refs/pr/<number>` を追加してください。マージ後は既定の `main` リビジョンを使用できます。すべてのモデルと `catalog.json` のアップロードが完了してから推論を実行してください。"),
+              text("Only selected fold weights/configurations are downloaded. Pin `--revision` to a model repository commit for reproducible downloads. Predictions include per-class probabilities in the saved class index order.",
+                   "僅下載所選 fold 的權重與設定。為確保下載結果可重現，請使用 `--revision` 指定模型儲存庫的 commit。預測結果依保存的類別索引順序包含各類別機率。",
+                   "選択した fold の重みと設定のみをダウンロードします。再現可能なダウンロードのため、`--revision` でモデルリポジトリのコミットを指定してください。予測結果には、保存されたクラスインデックス順の各クラスの確率が含まれます。"),
+              text("Case folders must provide one matching image per required stream. Both class/case/image folders and unlabeled case/image folders are supported.",
+                   "每個病例目錄須為各必要輸入流提供一張對應影像。同時支援 class/case/image 與不含類別標籤的 case/image 目錄結構。",
+                   "各症例フォルダーには、必要なストリームごとに対応する画像を 1 枚用意してください。class/case/image 構成と、クラスラベルのない case/image 構成の両方に対応しています。"),
+              text("Use `--ensemble` only when you explicitly want a mean of the selected models' probabilities. This is prediction on one cohort, not out-of-fold validation.",
+                   "若要平均所選模型的預測機率，再使用 `--ensemble`。這是在同一群體上進行預測，並非 out-of-fold 驗證。",
+                   "選択したモデルの予測確率を平均する場合に `--ensemble` を使用してください。同一コホートに対する予測であり、out-of-fold 検証ではありません。"), "",
+              text("Archive entries under `historical/` are tensor-only because their original fold/stream settings were not saved. They are included for completeness but are not automatically inferable.",
+                   "`historical/` 下的封存項目因未保存原始 fold／輸入流設定，因此僅封存張量，以保留完整紀錄；無法自動用於推論。",
+                   "`historical/` 配下のアーカイブ項目は、元の fold／ストリーム設定が保存されていないため、テンソルのみを収録しています。記録の完全性を保つためのものであり、自動推論には対応していません。"),
+              "", text("## Provenance and limits", "## 來源與限制", "## 来歴と制約"), "",
+              text("These are legacy research weights. Earlier experiments used case-level random folds, with identified patient-overlap concerns, and selected checkpoints using validation scores. Do not label those scores as patient-independent cross-validation results.",
+                   "這些權重來自歷史研究實驗。早期實驗採用病例層級的隨機 fold，已發現跨 fold 病人重疊的疑慮，並依驗證分數選取 checkpoint。不得將這些分數稱為病人互斥的交叉驗證結果。",
+                   "これらは過去の研究で得られた重みです。初期の実験では症例単位のランダムな fold 分割を用い、fold 間で患者が重複する懸念が確認されており、検証スコアに基づいてチェックポイントを選択していました。これらのスコアを、患者単位で独立した交差検証の結果と表記しないでください。"),
+              text("Class names bad/good are recorded labels; do not infer healthy/diseased meanings without the study definition.",
+                   "bad／good 是原始紀錄中的類別標籤；未取得研究定義前，不得將其直接解讀為健康／患病。",
+                   "bad／good は記録されたクラスラベルです。研究上の定義を確認せずに、健康／疾患を意味すると解釈しないでください。"),
+              text("Profiles are explicit declarations; tensor keys/shapes cannot prove historical stream semantics or preprocessing. In particular, four-/six-stream runtime versions were not retained; their antialias choice must be checked against original records.",
+                   "Profile 是明確宣告的設定；張量的鍵與形狀無法證實歷史輸入流語意或前處理方式。尤其四流／六流實驗未保留執行環境版本，其抗鋸齒選擇須依原始紀錄核對。",
+                   "プロファイルは明示的に宣言された設定です。テンソルのキーや形状から、過去のストリームの意味や前処理を証明することはできません。特に 4／6 ストリーム実験では実行環境のバージョンが保存されていないため、アンチエイリアスの選択を元の記録と照合する必要があります。"),
+              text("No model license was guessed. Complete the study-specific model documentation/license before treating this as a clinical release.",
+                   "未推定或擅自指定模型授權。將本集合視為臨床用途的發布版本前，須完成該研究的模型文件與授權說明。",
+                   "モデルのライセンスは推測に基づいて指定していません。臨床用途の公開版として扱う前に、本研究固有のモデル文書とライセンスを整備してください。")]
     if code_url:
-        lines += ["", "Public code snapshot: [code and complete usage instructions](" + code_url + "). See INFERENCE.md and MODEL_CATALOG.md in that snapshot."]
+        lines += ["", text(
+            "Public code snapshot: [code and complete usage instructions](" + code_url + "). See `INFERENCE.md` and `MODEL_CATALOG.md` in that snapshot.",
+            "公開程式碼快照：[程式碼與完整使用說明](" + code_url + ")。另請參閱該快照中的 `INFERENCE.md` 與 `MODEL_CATALOG.md`。",
+            "公開コードのスナップショット：[コードと完全な利用手順](" + code_url + ")。スナップショット内の `INFERENCE.md` と `MODEL_CATALOG.md` も参照してください。")]
     return "\n".join(lines) + "\n"
+
+
+def _collection_readme(items, profiles, code_url=None):
+    """Keep all language versions in the model card accepted by the Hub uploader."""
+    header = ("---\nlanguage:\n- en\n- zh\n- ja\ntags:\n- pytorch\n- timm\n"
+              "- multistream\n- research\n---\n\n"
+              "[English](#english) | [繁體中文](#traditional-chinese) | [日本語](#japanese)\n\n")
+    sections = []
+    for language, anchor in (("en", "english"), ("zh", "traditional-chinese"), ("ja", "japanese")):
+        sections.append('<a id="' + anchor + '"></a>\n\n'
+                        + _collection_readme_section(items, profiles, code_url, language))
+    return header + "\n---\n\n".join(sections)
 
 
 def _collection_model_card(metadata, item, profiles, code_url=None):
     """Describe this leaf while directing users to the shared collection entry point."""
-    card = _model_card(metadata, code_url)
-    start, end = card.index("## Loading"), card.index("## Preprocessing and verification")
-    usage = ("## Loading this condition and fold\n\n"
-             "Install the code repository requirements and run from its new/ directory. "
-             "The shared loader and requirements live at the collection root, not in this model directory.\n\n"
-             "```bash\npython tools/infer_published.py --repo ntuhophai/ERM-AI --condition "
-             + item["condition"] + " --fold " + str(item["fold"])
-             + " --root /path/to/cases --output predictions/" + item["condition"]
-             + "_fold" + str(item["fold"]) + "\n```\n\n"
-             "Before the model PR is merged, append --revision refs/pr/<number>; after merge the default main revision can be used.\n\n"
-             "Only the selected weights/config are downloaded. Provide one image for each ordered stream. "
-             "The local tool uses its trusted model definition and saves class probabilities.\n\n")
-    card = card[:start] + usage + card[end:]
-    card += "\nCollection condition: " + item["condition"] + f"; zero-based fold: {item['fold']}.\n"
-    card += "\nDeclared preprocessing:\n\n```json\n" + json.dumps(metadata["preprocessing"], indent=2) + "\n```\n"
-    card += "\nProfile note: " + profiles["conditions"][item["condition"]].get("notes", "Operator-declared settings") + "\n"
-    if code_url:
-        documentation = code_url.replace("/tree/", "/blob/", 1).rstrip("/") + "/INFERENCE.md"
-        card += "\n[Complete download, inference and output instructions](" + documentation + ")\n"
-    return card
+    command = ("```bash\npython tools/infer_published.py --repo ntuhophai/ERM-AI --condition "
+               + item["condition"] + " --fold " + str(item["fold"])
+               + " --root /path/to/cases --output predictions/" + item["condition"]
+               + "_fold" + str(item["fold"]) + "\n```\n\n")
+
+    def section(language):
+        def text(english, chinese, japanese):
+            return {"en": english, "zh": chinese, "ja": japanese}[language]
+
+        usage = (text("## Loading this condition and fold", "## 載入此條件與 fold", "## この条件と fold の読み込み") + "\n\n"
+                 + text("Install the code repository requirements and run from its `new/` directory. The shared loader and requirements live at the collection root, not in this model directory.",
+                        "請安裝程式碼儲存庫列出的相依套件，並從其中的 `new/` 目錄執行。共用載入器與相依套件清單位於模型集合根目錄，此模型子目錄內不含這些檔案。",
+                        "コードリポジトリに記載された依存パッケージをインストールし、`new/` ディレクトリから実行してください。共通ローダーと依存パッケージの一覧はコレクションのルートにあり、このモデルのサブディレクトリには含まれていません。") + "\n\n" + command
+                 + text("Before the model PR is merged, append `--revision refs/pr/<number>`; after merge the default `main` revision can be used.",
+                        "模型 PR 合併前，請加上 `--revision refs/pr/<number>`；合併後可使用預設的 `main` 版本。",
+                        "モデルの PR がマージされる前は、`--revision refs/pr/<number>` を追加してください。マージ後は既定の `main` リビジョンを使用できます。") + "\n\n"
+                 + text("Only the selected weights/config are downloaded. Provide one image for each ordered stream. The local tool uses its trusted model definition and saves class probabilities.",
+                        "僅下載所選模型的權重與設定。請依輸入流順序提供各流對應的一張影像。本機工具使用其受信任的模型定義，並保存各類別機率。",
+                        "選択したモデルの重みと設定のみをダウンロードします。ストリームの順序に従い、各ストリームに対応する画像を 1 枚ずつ用意してください。ローカルツールは信頼済みのモデル定義を使用し、各クラスの確率を保存します。") + "\n\n")
+        card = _model_card_section(metadata, code_url, language, loading=usage)
+        card += "\n" + text(f"Collection condition: `{item['condition']}`; zero-based fold: `{item['fold']}`.",
+                             f"集合條件：`{item['condition']}`；從 0 開始編號的 fold：`{item['fold']}`。",
+                             f"コレクションの条件：`{item['condition']}`。0 始まりの fold：`{item['fold']}`。") + "\n"
+        card += "\n" + text("Declared preprocessing:", "宣告的前處理設定：", "宣言された前処理設定：") + "\n\n```json\n"
+        card += json.dumps(metadata["preprocessing"], indent=2) + "\n```\n"
+        card += "\n" + text("Profile note: ", "設定註記：", "設定の注記：")
+        card += _collection_profile_note(profiles["conditions"][item["condition"]].get("notes"), language) + "\n"
+        if code_url:
+            documentation = code_url.replace("/tree/", "/blob/", 1).rstrip("/") + "/INFERENCE.md"
+            card += "\n[" + text("Complete download, inference and output instructions", "完整下載、推論與輸出說明", "ダウンロード、推論、出力の完全な手順") + "](" + documentation + ")\n"
+        return card
+
+    return _multilingual_card(section, ("pytorch", "timm", "multistream", "image-classification", metadata["artifact_kind"]))
 
 
 def export_collection(records_root, profiles_path, output, code_url=None, plan_only=False):
