@@ -1,6 +1,6 @@
 # 從 Hugging Face 下載並推論
 
-這份說明適用整套 `ntuhophai/ERM-AI` 模型 collection。需先等 BAT 完成全部模型與 `catalog.json` 上傳到 PR。PR 尚未合併時，每個 Hub 指令都需加 `--revision refs/pr/<number>`；合併後可使用以下預設正式版本指令。舊版只有根目錄單一模型時，尚不適用 collection 工具。
+這份說明適用整套 `ntuhophai/ERM-AI` 模型 collection。完整 collection 已發布於 Hugging Face 的預設 `main` 版本，以下指令可直接使用；若需重現結果，請見第 7 節固定模型版本。舊版只有根目錄單一模型時，尚不適用 collection 工具。
 
 ## 1. 安裝程式環境
 
@@ -102,7 +102,9 @@ ensemble 是同一批影像經選定模型推論後的平均機率；**不是內
 這時不需 Hub 網路。也可從你的已下載 snapshot 目錄執行。
 
 
-## 8. PR 尚未合併時推論
+## 8. 維護者：合併前測試新的 Hugging Face PR
+
+一般使用者不需要此節：目前完整 collection 已發布於 `main`。本節僅供維護者日後發布新版本時，在合併前測試 Hub PR。
 
 BAT 完成後會顯示 Hugging Face PR 網址，例如 `https://huggingface.co/ntuhophai/ERM-AI/discussions/42`。網址末尾數字就是 PR 編號；以下 `42` 只是範例，請換成你的實際編號。
 

@@ -1,6 +1,6 @@
 # 全部模型、stream 與 fold
 
-Hugging Face 目的地：[ntuhophai/ERM-AI](https://huggingface.co/ntuhophai/ERM-AI)。新版 BAT 將整套模型提交到同一個 Hugging Face PR。管理者合併後才會出現在正式版本；合併前可指定 PR revision 推論。
+Hugging Face 目的地：[ntuhophai/ERM-AI](https://huggingface.co/ntuhophai/ERM-AI)。完整 collection 已合併並發布於預設的 `main` 版本，可直接下載與推論。日後以 BAT 發布更新時，會先提交到 Hugging Face PR，待管理者合併後才出現在正式版本（見 [PUBLISHING.md](PUBLISHING.md)）。
 
 ## 包含哪些模型
 
@@ -41,6 +41,7 @@ fold 編號為 **0 到 9**。每個模型保留獨立 `model.safetensors`、`con
 ```text
 ntuhophai/ERM-AI (Hugging Face)
 ├── catalog.json                         # 全167模型索引、條件、fold與SHA256
+├── LICENSE                              # Apache License 2.0
 ├── modeling_multistream.py              # 共用公開模型定義
 ├── README.md
 ├── requirements.txt

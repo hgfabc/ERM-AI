@@ -358,6 +358,6 @@ Hugging Face のモデルによる推論例（`new/` から実行）：
 .\.venv\Scripts\python.exe tools/infer_published.py --repo ntuhophai/ERM-AI --condition fusion_8 --all-folds --root "D:/my_cases" --output "predictions/fusion8_all"
 ```
 
-BAT によるすべてのモデルと catalog の PR へのアップロードが完了するまでお待ちください。merge 前は `--revision refs/pr/<number>` を追加し、merge 後はデフォルトの公開バージョンを使用できます。ダウンロードされるのは指定したモデルのみで、画像はローカルに残ります。これらの legacy 重みには患者分割のメタデータがないため、その推論結果を新バージョンの患者単位 CV の成績として報告することはできません。
+完全なモデルコレクションは既定の `main` リビジョンで公開済みのため、上記のコマンドはそのまま使用できます。バージョンを固定する場合は `--revision <commit-sha>` を追加してください（[INFERENCE.md](INFERENCE.md) を参照）。管理者がまだ merge されていない新しい Hub PR を確認する場合は、`--revision refs/pr/<number>` を使用できます。ダウンロードされるのは指定したモデルのみで、画像はローカルに残ります。これらの legacy 重みには患者分割のメタデータがないため、その推論結果を新バージョンの患者単位 CV の成績として報告することはできません。
 
 2026-10-12 の更新後の全テスト結果：**186 passed、33 subtests passed**。公開対象の 160 個の fold モデルについて、重みのキー、形状、データ型が宣言されたアーキテクチャと一致することも確認済みです。完全なモデルパッケージはローカルにエクスポート済みで、アップロード前のチェックを通過しています。実際のリモート転送は BAT が実行します。

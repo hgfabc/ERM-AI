@@ -358,6 +358,6 @@ Hugging Face 模型推論範例（從 `new/` 執行）：
 .\.venv\Scripts\python.exe tools/infer_published.py --repo ntuhophai/ERM-AI --condition fusion_8 --all-folds --root "D:/my_cases" --output "predictions/fusion8_all"
 ```
 
-請等候 BAT 將全部模型與模型目錄上傳至 PR。尚未合併時，請加上 `--revision refs/pr/<number>`；合併後可使用預設發布版本。僅下載指定模型，影像會留在本機。這批舊版權重不含病人切分中繼資料，其推論成績不能改稱為新版病人分組交叉驗證結果。
+完整模型集合已發布於預設的 `main` 版本，上述指令可直接使用。如需固定版本，請加上 `--revision <commit-sha>`（見 [INFERENCE.md](INFERENCE.md)）；維護者若要測試尚未合併的新 Hub PR，可使用 `--revision refs/pr/<number>`。僅下載指定模型，影像會留在本機。這批舊版權重不含病人切分中繼資料，其推論成績不能改稱為新版病人分組交叉驗證結果。
 
 **2026-10-12** 更新後記錄的完整測試結果為 **186 passed、33 subtests passed**。全部 160 個正式折模型的權重鍵、形狀與資料型別均符合宣告架構；完整模型包已在本機匯出並通過上傳前檢查，實際遠端傳輸由 BAT 執行。以上為歷史驗證紀錄，並非本次文件翻譯時重新執行的測試。
